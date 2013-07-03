@@ -33,6 +33,7 @@ public class MainMenuGUI : MonoBehaviour {
 		if (GUI.Button(new Rect(560, 90, 105, 20), "Story Mode"))
 		{
 			Application.LoadLevel("Story_Mode");
+			print ("Story_Mode");
 		}
 		
 		//
@@ -42,6 +43,7 @@ public class MainMenuGUI : MonoBehaviour {
 		if (GUI.Button(new Rect(560, 120, 105, 20), "Arcade Mode"))
 		{
 			Application.LoadLevel("Arcade_Mode");	
+			print ("Arcade_Mode");
 		}
 		
 		//
@@ -50,7 +52,8 @@ public class MainMenuGUI : MonoBehaviour {
 		
 		if (GUI.Button(new Rect(560, 150, 105, 20), "Versus Mode"))
 		{
-			Application.LoadLevel("Versus_Mode");	
+			Application.LoadLevel("Versus_Mode");
+			print ("Versus_Mode");	
 		}
 		
 		//
@@ -59,7 +62,8 @@ public class MainMenuGUI : MonoBehaviour {
 		
 		if (GUI.Button(new Rect(560, 180, 105, 20), "Time Attack"))
 		{
-			Application.LoadLevel("Time_Attack");	
+			Application.LoadLevel("Time_Attack");
+			print ("Time_Attack");	
 		}
 		
 		//
@@ -68,7 +72,8 @@ public class MainMenuGUI : MonoBehaviour {
 		
 		if (GUI.Button(new Rect(560, 210, 105, 20), "Challenge Mode"))
 		{
-			Application.LoadLevel("Challenge_Mode");	
+			Application.LoadLevel("Challenge_Mode");
+			print ("Challenge_Mode");	
 		}
 		
 		//
@@ -77,7 +82,8 @@ public class MainMenuGUI : MonoBehaviour {
 		
 		if (GUI.Button(new Rect(560, 240, 105, 20), "Customize"))
 		{
-			Application.LoadLevel("Customize");	
+			Application.LoadLevel("Customize");
+			print ("Customize");	
 		}
 		
 		//
@@ -86,7 +92,8 @@ public class MainMenuGUI : MonoBehaviour {
 		
 		if (GUI.Button(new Rect(560, 270, 105, 20), "Options"))
 		{
-			Application.LoadLevel("Option");	
+			Application.LoadLevel("Option");
+			print ("Option");	
 		}
 		
 #endregion		

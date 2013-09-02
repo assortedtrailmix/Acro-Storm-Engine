@@ -1,0 +1,149 @@
+#if UNITY_EDITOR
+#define DEBUG
+#endif
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using Assets.GameAssets.Scripts.Actors;
+using UnityEngine;
+using Debug = UnityEngine.Debug;
+
+[RequireComponent(typeof(Rigidbody))]
+public class PidJet : MonoBehaviour
+{
+    #region Public Parameters
+    public string POIRootName = "POIs";
+    public string ModelRootName = "Model";
+
+    public float HoverHeight = 5f;
+
+    public float HeightPIDLimit = 10f;
+
+
+    public float Height_P, Height_I, Height_D;
+    public bool InverseReaction;
+    public bool UseGravity;
+    public FloatLimit HeightForceLimit;
+    #endregion
+
+    #region Public Vars
+
+    #endregion
+
+    #region Private Vars
+    private Transform _poiTransform;
+    private Transform _modelTransform;
+
+    private Transform transform;
+    private Rigidbody rigidbody;
+
+    private Anchor _heightAnchor;
+
+    private RaycastHit _lastHit;
+    #endregion
+
+    #region Initalization Code
+
+    void Awake()
+    {
+        InitCachedVars();
+        InitHeightPID();
+        InitGraph();
+    }
+
+    private void InitCachedVars()
+    {
+        transform = GetComponent<Transform>();
+
+        rigidbody = GetComponent<Rigidbody>();
+        rigidbody.useGravity = false;
+
+        _poiTransform = string.IsNullOrEmpty(POIRootName) ? transform.FindChild(POIRootName) : transform;
+        _modelTransform = string.IsNullOrEmpty(ModelRootName) ? transform.FindChild(ModelRootName) : transform;
+    }
+    private void InitHeightPID()
+    {
+        Transform heightAnchorTransform = POI.GetPoiByName(_poiTransform, "height_anchor");
+
+        PID heightPid = new PID();
+        heightPid.SetTunings(Height_P, Height_I, Height_D);
+        heightPid.SetOutputLimits(HeightForceLimit.Min, HeightForceLimit.Max);
+        heightPid.SetSampleTime(Time.fixedDeltaTime);
+        heightPid.InverseReaction = false;
+        _heightAnchor = new Anchor(transform, heightAnchorTransform, heightPid);
+        StartCoroutine(UpdateHeightPID());
+    }
+    private void InitGraph()
+    {
+        Graph.YMax = 10f;
+        Graph.YMin = 0f;
+        Graph.channel[0].isActive = true;
+        Graph.channel[1].isActive = true;
+    }
+    #endregion
+
+    #region FixedUpdate Code
+
+    void FixedUpdate()
+    {
+        UpdateHeightPID();
+        if (UseGravity)
+        UpdateGravity();
+    }
+
+    void UpdateGravity()
+    {
+        Vector3 gravity = transform.TransformDirection(Physics.gravity * rigidbody.mass);
+        rigidbody.AddForce(gravity,ForceMode.Acceleration);
+    }
+
+    private bool EndPID = false;
+    IEnumerator  UpdateHeightPID()
+    {
+        while (!EndPID)
+        {
+            // _heightAnchor.PidController.SetTunings(Height_P,Height_I,Height_D);
+            // _heightAnchor.PidController.InverseReaction = InverseReaction;
+
+            _heightAnchor.PidController.SetTunings(Height_P, Height_I, Height_D);
+            _heightAnchor.PidController.SetOutputLimits(HeightForceLimit.Min, HeightForceLimit.Max);
+            _heightAnchor.PidController.SetSampleTime(Time.fixedDeltaTime);
+            _heightAnchor.PidController.InverseReaction = false;
+            if (Physics.Raycast(_heightAnchor.Position, -transform.up, out _lastHit))
+            {
+                if (_heightAnchor.PidController.IsActive == false)
+                    _heightAnchor.PidController.IsActive = true;
+
+                float height = _lastHit.distance;
+                if (height < HeightPIDLimit)
+                {
+                    _heightAnchor.PidController.Update(height, HoverHeight);
+                    Vector3 heightForce = transform.up;
+                    heightForce *= _heightAnchor.PidController.Output;
+                    rigidbody.AddForce(heightForce*Time.deltaTime);
+                }
+                else
+                {
+                    _heightAnchor.PidController.IsActive = false;
+                }
+            }
+            else
+            {
+                _heightAnchor.PidController.IsActive = false;
+            }
+            Graph.channel[0].Feed(HoverHeight);
+            Graph.channel[1].Feed(_lastHit.distance);
+            yield return new WaitForFixedUpdate();
+        }
+    }
+
+    #endregion
+
+    void OnGUI()
+    {
+        GUILayout.Label(_heightAnchor.PidController.Output.ToString());
+        GUILayout.Label(_lastHit.distance.ToString());
+        GUILayout.Label(_heightAnchor.PidController.Setpoint.ToString());
+    }
+}

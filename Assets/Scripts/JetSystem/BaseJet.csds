@@ -1,0 +1,288 @@
+#if UNITY_EDITOR
+    #define DEBUG
+#endif
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using Assets.GameAssets.Scripts.Actors;
+using UnityEditor;
+using UnityEngine;
+using Debug = UnityEngine.Debug;
+
+namespace Assets.Scripts.JetSystem
+{
+    /// <summary>
+    /// Default Rigidbody Settings:
+    /// Mass: 600
+    /// Drag: 0
+    /// Angular Drag: 2
+    /// Gravity: True
+    /// Freeze Positon: Free on all Axes
+    /// Freeze Rotation: Free on X Axis, Locked on Y,Z
+    /// 
+    /// 
+    /// Default Spring Settings:
+    /// Anchor Length: 11
+    /// Spring Constant: 600
+    /// Damping Contant: 300
+    /// </summary>
+    /// 
+    /// 
+    [RequireComponent(typeof(Rigidbody))]
+    public class BaseJet : MonoBehaviour
+    {
+        public string POIRootName = "POIs";
+        public string ModelRootName = "Model";
+        public float HoverHeight = 5f;
+        public float MaxForce = 99999;
+        #region Private Transforms
+
+        private Transform _transform;
+        private Transform _poiTransform;
+        private Transform _anchorTransform;
+        private Transform _modelTransform;
+        private Rigidbody _rigidbody;
+
+        #endregion
+        private float _throttle;
+        private float _steering;
+        private readonly Dictionary<string, Anchor> _anchors = new Dictionary<string, Anchor>();
+        private readonly Dictionary<string, Stabilizer> _stabilizers = new Dictionary<string, Stabilizer>();
+        // Use this for initialization
+        private Transform _centerOfMass;
+        public bool Gravity;
+        #region Initialization Code
+
+        private void Awake()
+        {
+
+
+            _rigidbody = GetComponent<Rigidbody>();
+            InitTransforms();
+            InitCOM();
+            StartCoroutine("UpdateHeight");
+        }
+
+        void InitTransforms()
+        {
+
+            _transform = GetComponent<Transform>();
+            //Setup Transform references
+            _modelTransform = string.IsNullOrEmpty(ModelRootName) ?  _transform : _transform.FindChild(ModelRootName);
+            _poiTransform = string.IsNullOrEmpty(POIRootName) ?     _transform : _transform.FindChild(POIRootName);
+            _anchorTransform = string.IsNullOrEmpty(AnchorRootName) ? _transform : _transform.FindChild(AnchorRootName);
+
+            //Hide POIs
+            POI.HidePOIs(_poiTransform);
+            POI.HidePOIs(_anchorTransform);
+        }
+
+        void InitCOM()
+        {
+            _centerOfMass = POI.GetPoiByName(_poiTransform, "com").Transform;
+            _rigidbody.centerOfMass = _modelTransform.InverseTransformPoint(_centerOfMass.position);
+            _rigidbody.useGravity = false;
+        }
+        public float Height_kP, Height_kI, Height_kD;
+        void InitAnchors()
+        {
+            var flAnchor = new Anchor(_transform,POI.GetPoiByName(_anchorTransform, "fl_anchor"), new PID());
+            var frAnchor = new Anchor(_transform, POI.GetPoiByName(_anchorTransform, "fr_anchor"), new PID());
+            var rlAnchor = new Anchor(_transform, POI.GetPoiByName(_anchorTransform, "rl_anchor"), new PID());
+            var rrAnchor = new Anchor(_transform, POI.GetPoiByName(_anchorTransform, "rr_anchor"), new PID());
+        
+        
+            _anchors.Add("FL", flAnchor);
+            _anchors.Add("FR", frAnchor);
+            _anchors.Add("RL", rlAnchor);
+            _anchors.Add("RR", rrAnchor);
+            UpdateAnchorValues();
+        }
+]
+        void UpdateAnchorValues()
+        {
+            foreach (Anchor anchor in _anchors.Values)
+            {
+                anchor.PidController.SetTunings(Anchor_kP, Anchor_kI, Anchor_kD);
+                anchor.PidController.SetOutputLimits(-MaxForce, MaxForce);
+                anchor.PidController.SetSampleTime(Time.fixedDeltaTime);
+                anchor.PidController.InverseReaction = false;
+            }
+        }
+
+        #endregion
+        #region Fixed Update Functions
+// ReSharper disable once UnusedMember.Local
+        void FixedUpdate()
+        {
+            UpdateGravity();
+
+        }
+
+        public float FakeActual;
+        private RaycastHit _lastHit;
+        public float AnchorLength = 10f;
+        public float AnchorForceMultiplier = 1f;
+        float _debugHeight;
+        float _debugForce;
+
+        IEnumerator UpdateAnchors()
+        {
+            while (true)
+            {
+               
+                UpdateAnchorValues();
+
+                foreach (Anchor anchor in _anchors.Values)
+                {
+                  //  if (!_anchors["FL"].Equals(anchor))
+                   //     continue;
+             
+                    Physics.Raycast(anchor.Position, -_transform.up, out _lastHit);
+                    float anchorHeight = _lastHit.distance;
+                    _debugHeight = anchorHeight;
+                    Debug.DrawLine(anchor.Position, anchor.Position);
+                    float pidForce;
+                    if (anchorHeight < AnchorLength)
+                    {
+                        if(!anchor.PidController.IsActive)
+                            anchor.PidController.IsActive = true;
+                        float scalingValue = TimeSpan.TicksPerSecond*0;
+                        scalingValue = 1;
+                        anchor.PidController.Update(anchorHeight, HoverHeight);
+                        pidForce = anchor.PidController.Output;
+                        Vector3 anchorForce = Vector3.up*pidForce;
+                        _rigidbody.AddForceAtPosition(anchorForce*Time.deltaTime, anchor.Position);
+                    }
+                    else
+                    {
+                        anchor.PidController.IsActive = false;
+                        pidForce = 0;
+                    } 
+                    if (_anchors[DebugAnchor].Equals(anchor))
+                    {
+                        _debugHeight = anchorHeight;
+                        _debugForce = pidForce;
+                        Graph.channel[1].Feed(HoverHeight);
+                        Graph.channel[0].Feed(_debugHeight);
+                    }
+                    yield return new WaitForFixedUpdate();
+                }
+
+            }
+        }
+        IEnumerator UpdateStabilizers()
+        {
+            while (true)
+            {
+
+                UpdateAnchorValues();
+
+                foreach (Anchor anchor in _anchors.Values)
+                {
+                    //  if (!_anchors["FL"].Equals(anchor))
+                    //     continue;
+
+                    Physics.Raycast(anchor.Position, -_transform.up, out _lastHit);
+                    float anchorHeight = _lastHit.distance;
+                    _debugHeight = anchorHeight;
+                    Debug.DrawLine(anchor.Position, anchor.Position);
+                    float pidForce;
+                    if (anchorHeight < AnchorLength)
+                    {
+                        if (!anchor.PidController.IsActive)
+                            anchor.PidController.IsActive = true;
+                        float scalingValue = TimeSpan.TicksPerSecond * 0;
+                        scalingValue = 1;
+                        anchor.PidController.Update(anchorHeight, HoverHeight);
+                        pidForce = anchor.PidController.Output;
+                        Vector3 anchorForce = Vector3.up * pidForce;
+                        _rigidbody.AddForceAtPosition(anchorForce * Time.deltaTime, anchor.Position);
+                    }
+                    else
+                    {
+                        anchor.PidController.IsActive = false;
+                        pidForce = 0;
+                    }
+                    if (_anchors[DebugAnchor].Equals(anchor))
+                    {
+                        _debugHeight = anchorHeight;
+                        _debugForce = pidForce;
+                        Graph.channel[1].Feed(HoverHeight);
+                        Graph.channel[0].Feed(_debugHeight);
+                    }
+                    yield return new WaitForFixedUpdate();
+                }
+
+            }
+        }
+        public string DebugAnchor;
+        private RaycastHit _gravityRaycastHit;
+
+        //TODO make static
+        public float GravityCheckDistance = 20f;
+        //TODO make static
+        public float RotationAdjustmentSpeed;
+        //TODO make static
+        public LayerMask GravityLayerMask;
+        private float _gravityCheckDistance = 20f;
+        //TODO Seperate out rotation code, and use PID to change it
+        void UpdateGravity()
+        {
+            if (!Gravity)
+                return;
+            if (Physics.Raycast(_rigidbody.centerOfMass, -_transform.up, out _lastHit, _gravityCheckDistance))
+            {
+                transform.up = _lastHit.normal;
+                Vector3 gravityForce = Physics.gravity * _rigidbody.mass;
+                _rigidbody.AddForce(Vector3.Scale(_lastHit.normal, gravityForce.normalized), ForceMode.Acceleration);
+            }
+            else
+            {
+                Vector3 gravityForce = Physics.gravity*_rigidbody.mass;
+                _rigidbody.AddForce(gravityForce, ForceMode.Acceleration);
+            }
+        }
+        #endregion
+        void Update()
+        {
+            UpdateDebug();
+        }
+
+        #region Debug Code
+
+       
+        [Conditional("DEBUG")]
+        void OnGUI()
+        {
+            GUILayout.BeginVertical();
+            GUILayout.Label(_debugHeight.ToString(CultureInfo.InvariantCulture));
+            GUILayout.Label(HoverHeight.ToString(CultureInfo.InvariantCulture));
+            GUILayout.Label(_debugForce.ToString(CultureInfo.InvariantCulture));
+            GUILayout.EndVertical();
+        }
+        void OnDrawGizmos()
+        {
+            if (!EditorApplication.isPlaying)   return;
+
+
+            Color originalColor = Gizmos.color;
+            Gizmos.color = Color.green;
+          //  Gizmos.DrawRay(_centerOfMass.position, -_centerOfMass.up * GravityCheckDistance);
+            Gizmos.color = Color.white;
+            Gizmos.DrawRay(_gravityRaycastHit.point, _gravityRaycastHit.normal * GravityCheckDistance);
+            Gizmos.color = originalColor;
+        }
+
+        [Conditional("DEBUG")]
+        void UpdateDebug()
+        {
+            UpdateAnchorValues();
+            return;
+        }
+        #endregion Debug Code
+    }
+}

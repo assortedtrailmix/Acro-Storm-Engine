@@ -1,3 +1,4 @@
+#if OLD
 using UnityEngine;
 using System.Collections;
 
@@ -132,3 +133,4 @@ public class TestCar01 : MonoBehaviour
 		}		
 	}
 }
+#endif

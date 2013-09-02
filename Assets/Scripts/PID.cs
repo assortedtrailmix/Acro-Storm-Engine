@@ -1,3 +1,4 @@
+#if OLD
 [System.Serializable]
 public class PID
 {
@@ -24,3 +25,4 @@ public class PID
 		return present * pFactor + integral * iFactor + deriv * dFactor;
 	}
 }
+#endif

@@ -44,9 +44,28 @@
 	</Reference>
   </ItemGroup>
   <ItemGroup>
+     <Compile Include="Assets\Scripts\Hover Sytem\PID.cs" />
+     <Compile Include="Assets\Scripts\JetSystem\Anchor.cs" />
+     <Compile Include="Assets\Scripts\JetSystem\Example.cs" />
+     <Compile Include="Assets\Scripts\JetSystem\FloatLimit.cs" />
+     <Compile Include="Assets\Scripts\JetSystem\JetAnchor.cs" />
+     <Compile Include="Assets\Scripts\JetSystem\JetOrientator.cs" />
+     <Compile Include="Assets\Scripts\JetSystem\PIDHeightTest.cs" />
+     <Compile Include="Assets\Scripts\JetSystem\PlayerJet.cs" />
      <Compile Include="Assets\Scripts\MainMenuGUI.cs" />
      <Compile Include="Assets\Scripts\PID.cs" />
      <Compile Include="Assets\Scripts\TestCar01.cs" />
+     <Compile Include="Assets\Scripts\Utility\Graph\GraphRuntime.cs" />
+     <Compile Include="Assets\Scripts\Utility\PIDThread.cs" />
+     <Compile Include="Assets\Scripts\Utility\POI.cs" />
+     <None Include="Assets\Scripts\JetSystem\PIDJet.csbak.txt" />
+ <Reference Include="Assembly-UnityScript-firstpass">
+ <HintPath>Library\ScriptAssemblies\Assembly-UnityScript-firstpass.dll</HintPath>
+ </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Assembly-CSharp-firstpass-vs.csproj">
+      <Project>{FE624460-6F7F-EAEA-D3E2-C398382F4AAD}</Project>      <Name>Assembly-CSharp-firstpass-vs</Name>    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
